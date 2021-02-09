@@ -115,9 +115,9 @@ class WebServer {
 		const cookies = []
 		Object.keys(values).forEach(k => {
 			const info = values[k]
-			let cook = `${k}=${info.value};`
+			let cook = `${k}=${info.value};httpOnly=${info.httpOnly || 'true'};`
 			if (info.duration) {
-				cook = `${cook}expires=${new Date(Date.now() + info.duration * 1000).toUTCString()};httpOnly=true;`
+				cook = `${cook}expires=${new Date(Date.now() + info.duration * 1000).toUTCString()};`
 			}
 			cookies.push(cook)
 		})
