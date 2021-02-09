@@ -1,0 +1,22 @@
+{
+	"name": "@reneos/server",
+	"version": "0.0.8",
+	"description": "Simple servers",
+	"main": "index.js",
+	"type": "module",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": {
+		"name": "Viktor Abdulov",
+		"email": "dev@reneos.com"
+	},
+	"license": "MIT",
+	"keywords": [
+		"http",
+		"web",
+		"server"
+	],
+	"dependencies": {
+	}
+}
