@@ -7,13 +7,10 @@ let _server
 let _routes = {}
 
 function Prepare() {
-	_middlewares.length = 0
-
 	_middlewares.push((req, res, next) => {
 		req.time = Date.now()
 		next()
 	})
-
 	_middlewares.push((req, res, next) => {
 		try {
 			req.remoteIp = (req.headers['x-real-ip'] ||
@@ -111,11 +108,16 @@ class WebServer {
 		_server.listen(port)
 	}
 
+	/**
+	 * 
+	 * @param {*} values {httpOnly:'true',duration:0,value:'cookievalue'}
+	 * @param {*} response 
+	 */
 	static SetCookies(values, response) {
 		const cookies = []
 		Object.keys(values).forEach(k => {
 			const info = values[k]
-			let cook = `${k}=${info.value};httpOnly=${info.httpOnly || 'true'};`
+			let cook = `${k}=${info.value};httpOnly=${info.httpOnly || 'true'};Path=${info.path || '/'};`
 			if (info.duration) {
 				cook = `${cook}expires=${new Date(Date.now() + info.duration * 1000).toUTCString()};`
 			}
@@ -133,6 +135,7 @@ class WebServer {
 	static Stop() {
 		if (_server)
 			_server.close()
+		_middlewares.length=0
 	}
 
 	/**
