@@ -92,7 +92,9 @@ async function OnRequest(request, responce) {
 	})
 }
 
-
+/**
+ * Include only public methods
+ */
 class WebServer {
 
 	/**
@@ -100,8 +102,7 @@ class WebServer {
 	 * @param {*} port 
 	 */
 	static Run(port) {
-		if (_server)
-			WebServer.Stop()
+		if (_server) WebServer.Stop()
 		Prepare()
 		_server = http.createServer(OnRequest)
 		_server.on("error", e => console.warn(e.message))
@@ -113,7 +114,7 @@ class WebServer {
 	 * @param {*} values {httpOnly:'true',duration:0,value:'cookievalue'}
 	 * @param {*} response 
 	 */
-	static SetCookies(values, response) {
+	static SetCookies(values={}, response) {
 		const cookies = []
 		Object.keys(values).forEach(k => {
 			const info = values[k]
