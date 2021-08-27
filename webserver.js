@@ -73,7 +73,6 @@ async function Work(request, responce) {
 	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 	responce.writeHead(200, { 'Content-type': 'application/json' })
 	responce.end(str)
-	//console.log(`Request by ${Date.now() - request.time} msec`)
 }
 
 async function OnRequest(request, responce) {

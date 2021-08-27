@@ -1,5 +1,5 @@
 import { EventEmitter } from "events"
-import WebSocket from "ws"
+import WebSocket, { WebSocketServer } from "ws"
 
 class Server extends EventEmitter {
 	get port() {
@@ -40,17 +40,11 @@ class Server extends EventEmitter {
 		if (this.config.local) {
 			opt.port = this.config.port;
 		}
-		this.ws = new WebSocket.Server(opt);
+		this.ws = new WebSocketServer(opt);
 
 		this.ws.on('connection', this.onClientConnect.bind(this));
 		this.ws.on('upgrade', this.emit.bind(this, 'upgrade'))
 		this.ws.on("headers", this.emit.bind(this, 'headers'))
-		/*this.ws.on("headers", ()=>{
-			console.log('headers')
-		})
-		this.ws.on("upgrade", ()=>{
-			console.log('upgrade')
-		})*/
 		this.ws.on("error", this.emit.bind(this, "error"));
 		this.ws.on('close', () => {
 			//console.log('close')
