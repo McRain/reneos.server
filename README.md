@@ -1,6 +1,8 @@
 # Simple Servers 
 https://github.com/McRain/reneos.server
 
+WsServer - Wrapper for ws package - added convenient pre-authorization support, sub-protocol implementation
+
 ## Install
 
 ```npm i @reneos/server```
