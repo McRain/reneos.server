@@ -22,6 +22,13 @@ function Parser(msg, uid){
     }
 }
 
+/**
+	* 
+	* @param {*} request 
+	* @param {*} socket 
+	* @param {*} head 
+	* @returns connection ID if allow or NULL if not allow
+	*/
 function Verify(request, socket, head){
     return request.headers['user'].id
 }
