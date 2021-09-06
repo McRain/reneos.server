@@ -1,6 +1,6 @@
 {
 	"name": "@reneos/server",
-	"version": "0.0.16",
+	"version": "0.0.17",
 	"description": "Simple servers",
 	"main": "index.js",
 	"type": "module",
@@ -18,6 +18,6 @@
 		"server"
 	],
 	"dependencies": {
-		"ws": "^8.2.0"
+		"ws": "^8.2.1"
 	}
 }

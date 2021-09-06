@@ -1,5 +1,12 @@
+import http from "http"
+import querystring from "querystring"
 import { EventEmitter } from "events"
-import WebSocket, { WebSocketServer } from "ws"
+
+import { WebSocketServer } from "ws"
+
+const _clientOptions = {
+	binary: false, mask: false
+}
 
 class Server extends EventEmitter {
 	get port() {
@@ -14,64 +21,79 @@ class Server extends EventEmitter {
 		super()
 		this.config = {
 			port: 8999,
-			local: true,
-			field: ""
+			protocol: "http"
 		}
 		this.connections = []
 	}
 
+	allow(request, socket, head) {
+		return Server.GenId(32)
+	}
+
 	start(config, verify) {
-		if (config)
-			this.config = {
-				port: 8999,
-				local: true,
-				field: 'user',
-				head: 'x-user',
-				...config
-			};
 
-		const opt = {
-			verifyClient: (info, cb) => {
-				return cb(true, 200, "OK");
-			}
-		};
-		if (verify)
-			opt.verifyClient = verify
-		if (this.config.local) {
-			opt.port = this.config.port;
+		this.verify = verify || this.allow
+
+		this.config = {
+			port: 8999,
+			protocol: "http",
+			...config
 		}
-		this.ws = new WebSocketServer(opt);
 
-		this.ws.on('connection', this.onClientConnect.bind(this));
+		this.server = http.createServer()
+		this.server.on("error", e => console.warn(e.message))
+
+		this.ws = new WebSocketServer({ noServer: true })
+
+		this.ws.on('connection', this.onClientConnect.bind(this))
 		this.ws.on('upgrade', this.emit.bind(this, 'upgrade'))
 		this.ws.on("headers", this.emit.bind(this, 'headers'))
-		this.ws.on("error", this.emit.bind(this, "error"));
-		this.ws.on('close', () => {
-			//console.log('close')
-		})
-		this.ws.on('listening', () => {
-			//console.log('listening')
-		})
-		if (!this.config.local)
-			this.server.listen(this.config.port);
+		this.ws.on("error", this.emit.bind(this, "error"))
+		this.ws.on('close', this.emit.bind(this, "close"))
+		this.ws.on('listening', this.emit.bind(this, "listening"))
+
+		this.server.on('upgrade', this.Upgrade.bind(this))
+		this.server.listen(this.config.port)
+
 		return this
 	}
 
-	onClientConnect(ws, req) {
-		const info = req[this.config.field]
-		const conn = new Connection(ws, req.id, info)
+	async Upgrade(request, socket, head) {
+		const u = new URL(request.url, `${this.config.protocol}://${request.headers.host}`)
+		request.query = querystring.parse(u.search.slice(1))
+		//internal or external verify	
+		const id = await this.verify(request, socket, head)
+		if (!id) {
+			socket.destroy()
+			return
+		}
+		this.ws.handleUpgrade(request, socket, head, this.onWsUpgrade.bind(this, id))
+	}
+
+	onWsUpgrade(id, ws) {
+		this.ws.emit('connection', ws, id);
+	}
+
+	onClientConnect(ws, id) {
+		const old = this.connections.find(c => c.id === id)
+		if (old) {
+			old.client.close()
+		}
+		const conn = new Connection(ws, id)
 		ws.on("error", this.emit.bind(this, "error", conn))
 		ws.on("message", this.onMessage.bind(this, conn));
 		ws.on("close", this.onClose.bind(this, conn))
 
 		this.connections.push(conn)
 
-		this.emit("connect", info, conn);
+		this.emit("connect", id, conn);
 	}
 
 	onClose(conn, code, reason) {
-		this.connections = this.connections.filter(cn => cn.id !== conn.id)
-		this.emit("disconnect", conn, code, reason)
+		const index = this.connections.indexOf(conn)
+		if (index >= 0)
+			this.connections.splice(index, 1)
+		this.emit("disconnect", conn.id, code, reason)
 	}
 
 	onMessage(conn, msg) {
@@ -79,10 +101,10 @@ class Server extends EventEmitter {
 		try {
 			message = JSON.parse(msg)
 		} catch (e) {
-			this.emit('message', msg, conn.id, conn.clientId)
+			this.emit('message', msg, conn.id, conn.info)
 			return
 		}
-		this.emit("message", message, conn.id, conn.clientId, conn.info);
+		this.emit("message", message, conn.id, conn.info);
 	}
 
 	/**
@@ -155,7 +177,7 @@ class Server extends EventEmitter {
 		}
 	}
 
-	genId(len = 12) {
+	static GenId(len = 12) {
 		const sym = "ABCDEFGHIKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890";
 		let str = "";
 		for (let i = 0; i < len; i++)
@@ -164,39 +186,18 @@ class Server extends EventEmitter {
 	}
 }
 
-const _connClient = Symbol()
-const _connId = Symbol()
-
-class Connection {
+class Connection extends EventEmitter {
 	/**
 	 * 
 	 * @param {*} ws - Client socket
 	 * @param {*} connId Unique id for this connection
-	 * @param {*} parameters any parameters for filter on send by parameters
+	 * @param {ANY} payload
 	 */
-	constructor(ws, connId, info) {
-		this[_connId] = connId
-		this[_connClient] = ws
+	constructor(ws, id) {
+		super()
+		this.id = id
+		this.client = ws
 		this.callbacks = []
-		this.info = info
-	}
-
-	/**
-	 * User ID
-	 */
-	get clientId() {
-		return this.info.id
-	}
-
-	/**
-	 * Unique id for this connection
-	 */
-	get id() {
-		return this[_connId]
-	}
-
-	get client() {
-		return this[_connClient];
 	}
 
 	get ready() {
@@ -229,12 +230,12 @@ class Connection {
 		this.callbacks = this.callbacks.filter(c => c.time >= dn)
 	}
 
-	send(str) {
+	send(value) {
 		if (this.client !== null && this.client.readyState === 1/*WebSocket.OPEN*/) {
 			try {
-				this.client.send(str, { binary: false, mask: false }, () => { });
+				this.client.send(value, _clientOptions, () => { });
 			} catch (e) {
-
+				this.emit('error', e)
 			}
 		}
 	}
