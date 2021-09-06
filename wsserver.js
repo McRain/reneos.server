@@ -9,6 +9,7 @@ const _clientOptions = {
 }
 
 class Server extends EventEmitter {
+
 	get port() {
 		return this.config.port
 	}
@@ -101,10 +102,10 @@ class Server extends EventEmitter {
 		try {
 			message = JSON.parse(msg)
 		} catch (e) {
-			this.emit('message', msg, conn.id, conn.info)
+			this.emit('message', msg, conn.id)
 			return
 		}
-		this.emit("message", message, conn.id, conn.info);
+		this.emit("message", message, conn.id);
 	}
 
 	/**
@@ -114,7 +115,7 @@ class Server extends EventEmitter {
 	find(filter) {
 		return this.connections.filter(c => {
 			Object.keys(filter).forEach(k => {
-				if (c.info[k] !== filter[k])
+				if (c[k] !== filter[k])
 					return false
 			})
 			return true
@@ -129,7 +130,7 @@ class Server extends EventEmitter {
 	exclude(filter = {}) {
 		return this.connections.filter(c => {
 			Object.keys(filter).forEach(k => {
-				if (c.info[k] === filter[k])
+				if (c[k] === filter[k])
 					return false
 			})
 			return true
@@ -191,7 +192,6 @@ class Connection extends EventEmitter {
 	 * 
 	 * @param {*} ws - Client socket
 	 * @param {*} connId Unique id for this connection
-	 * @param {ANY} payload
 	 */
 	constructor(ws, id) {
 		super()
