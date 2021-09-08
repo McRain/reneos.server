@@ -1,7 +1,7 @@
 # Simple Servers 
 https://github.com/McRain/reneos.server
 
-This package is designed to quickly launch lightweight servers (http or websocket).
+WsServer - Wrapper for ws package - added convenient pre-authorization support, sub-protocol implementation, network callbacks implemented
 
 ## Install
 
@@ -46,29 +46,5 @@ _server.on('upgrade', () => { /*console.log('upgrade')*/ })
 _server.on('headers', () => { /*console.log('headers')*/ })
 _server.on("message", Parser)
 _server.start({port:12345},Verify)
-```
-
-## Usage WebServer
-
-```js
-import { WebServer } from "@reneos/server"
-
-function Parser(req,res,next){
-    const headers = req.headers['x-user']
-		next()
-}
-
-async function Api(req,res){
-	res.cookie = {
-		key:'value
-	}
-	return {
-		result:true
-	}
-}
-
-WebServer.Use(Parser)
-WebServer.AddRoute('/api',Api)
-WebServer.Run(8080)
 ```
 
