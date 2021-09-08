@@ -1,5 +1,4 @@
 import http from "http"
-import querystring from "querystring"
 
 const _middlewares = []
 
@@ -27,8 +26,14 @@ function Prepare() {
 	_middlewares.push((req, res, next) => {
 		const u = new URL(req.url, `http://${req.headers.host}`)
 		try {
+			req.protocol = u.protocol
 			req.pathname = u.pathname
-			req.query = querystring.parse(u.search.slice(1))
+			req.hash = u.hash
+			req.query = {}
+			u.searchParams.forEach((value, name)=>{
+				req.query[name] = value
+				console.log(value)
+			})
 		} catch (error) {
 			console.warn(error.message)
 		}
@@ -43,6 +48,7 @@ function Prepare() {
 				req.cookie[line.shift().trim()] = decodeURI(line.join('='));
 			});
 		}
+		next()
 	})
 }
 
@@ -73,6 +79,7 @@ async function Work(request, responce) {
 	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 	responce.writeHead(200, { 'Content-type': 'application/json' })
 	responce.end(str)
+	//console.log(`Request by ${Date.now() - request.time} msec`)
 }
 
 async function OnRequest(request, responce) {
@@ -101,8 +108,7 @@ class WebServer {
 	 * @param {*} port 
 	 */
 	static Run(port) {
-		if (_server) WebServer.Stop()
-		Prepare()
+		//if (_server) WebServer.Stop()		
 		_server = http.createServer(OnRequest)
 		_server.on("error", e => console.warn(e.message))
 		_server.listen(port)
@@ -139,11 +145,11 @@ class WebServer {
 	}
 
 	/**
-	 * Промежуточный обработчик 
+	 * 
 	 * @param {Function} handler (req,res,next) 
 	 */
-	static Use(handler) {
-		_middlewares.push(handler)
+	 static Use(handler,first=true) {
+		_middlewares[first?'unshift':'push'](handler)
 	}
 	/**
 	 * 
@@ -165,5 +171,7 @@ class WebServer {
 		_routes[key] = handler
 	}
 }
+
+Prepare()
 
 export default WebServer

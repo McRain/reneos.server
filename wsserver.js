@@ -144,7 +144,7 @@ class Server extends EventEmitter {
 	 */
 	write(data, excludes) {
 		const targets = this.exclude(excludes)
-		targets.forEach(c => c.send(JSON.stringify(data)))
+		targets.forEach(c => c.send(data))
 	}
 
 	/**
@@ -153,18 +153,23 @@ class Server extends EventEmitter {
 	 * @param {object} excludes key:value
 	 */
 	send(data, excludes) {
-		const msg = JSON.stringify(data)
 		const targets = this.exclude(excludes)
-		targets.forEach(c => c.send(msg))
+		targets.forEach(c => c.send(data))
 	}
 	sendToAll(data) {
-		this.connections.forEach(c => c.send(JSON.stringify(data)))
+		this.connections.forEach(c => c.send(data))
 	}
+	/**
+	 * 
+	 * @param {*} data :Buffer or string
+	 * @param {*} recivers 
+	 */
 	sendTo(data, recivers) {
-		const targets = this.connections.filter(c => {
-			return recivers.includes(c.id)
-		})
-		targets.forEach(c => c.send(JSON.stringify(data)))
+		for(let i=this.connections.length-1;i>=0;i--){
+			const conn = this.connections[i]
+			if(recivers.includes(conn.id))
+				conn.send(data)
+		}
 	}
 
 	sendToOne(data, target) {
