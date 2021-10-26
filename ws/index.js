@@ -4,6 +4,8 @@ import { EventEmitter } from "events"
 
 import { WebSocketServer } from "ws"
 
+import * as Protocols from './protocols/index.js'
+
 const _clientOptions = {
 	binary: false, mask: false
 }
@@ -24,6 +26,7 @@ class Server extends EventEmitter {
 			port: 8999,
 			protocol: "http"
 		}
+		this.protocol = {}
 		this.connections = []
 	}
 
@@ -32,6 +35,8 @@ class Server extends EventEmitter {
 	}
 
 	start(config, verify) {
+
+		this.protocol = Protocols[config.protocol || 'json']
 
 		this.verify = verify || this.allow
 
@@ -80,7 +85,7 @@ class Server extends EventEmitter {
 		if (old) {
 			old.client.close()
 		}
-		const conn = new Connection(ws, id)
+		const conn = new Connection(ws, id, this.protocol.encode)
 		ws.on("error", this.emit.bind(this, "error", conn))
 		ws.on("message", this.onMessage.bind(this, conn));
 		ws.on("close", this.onClose.bind(this, conn))
@@ -97,15 +102,14 @@ class Server extends EventEmitter {
 		this.emit("disconnect", conn.id, code, reason)
 	}
 
-	onMessage(conn, msg) {
-		let message;
+	async onMessage(conn, msg) {
+		const { decode } = this.protocol
 		try {
-			message = JSON.parse(msg)
-		} catch (e) {
+			const message = await decode({}, msg, conn.id)
+			this.emit("message", message, conn.id);
+		} catch (error) {
 			this.emit('message', msg, conn.id)
-			return
 		}
-		this.emit("message", message, conn.id);
 	}
 
 	/**
@@ -120,6 +124,15 @@ class Server extends EventEmitter {
 			})
 			return true
 		})
+	}
+
+	closeConnection(target) {
+		const t = this.connections.find(c => c.id === target)
+		if (!t)
+			return
+		this.connections = this.connections.filter(c => c.id !== target)
+		t.close()
+
 	}
 
 	/**
@@ -165,15 +178,15 @@ class Server extends EventEmitter {
 	 * @param {*} recivers 
 	 */
 	sendTo(data, recivers) {
-		for(let i=this.connections.length-1;i>=0;i--){
+		for (let i = this.connections.length - 1; i >= 0; i--) {
 			const conn = this.connections[i]
-			if(recivers.includes(conn.id))
+			if (recivers.includes(conn.id))
 				conn.send(data)
 		}
 	}
 
 	sendToOne(data, target) {
-		const t = targets.find(c => c.id === target)
+		const t = this.connections.find(c => c.id === target)
 		if (t) {
 			try {
 				t.send(data)
@@ -198,11 +211,16 @@ class Connection extends EventEmitter {
 	 * @param {*} ws - Client socket
 	 * @param {*} connId Unique id for this connection
 	 */
-	constructor(ws, id) {
+	constructor(ws, id, encode) {
 		super()
 		this.id = id
 		this.client = ws
 		this.callbacks = []
+		this.encoder = encode
+	}
+
+	close() {
+		this.client.close()
 	}
 
 	get ready() {
@@ -235,10 +253,11 @@ class Connection extends EventEmitter {
 		this.callbacks = this.callbacks.filter(c => c.time >= dn)
 	}
 
-	send(value) {
+	async send(value) {
 		if (this.client !== null && this.client.readyState === 1/*WebSocket.OPEN*/) {
 			try {
-				this.client.send(value, _clientOptions, () => { });
+				const msg = await this.encoder(value, this.id)
+				this.client.send(msg, _clientOptions, () => { });
 			} catch (e) {
 				this.emit('error', e)
 			}

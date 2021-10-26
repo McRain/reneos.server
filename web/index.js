@@ -1,16 +1,23 @@
 import http from "http"
 
-const _middlewares = []
-
-let _server
-let _routes = {}
-
-function Prepare() {
-	_middlewares.push((req, res, next) => {
+const _middlewares = [
+	/**
+	 * time
+	 * @param {*} req 
+	 * @param {*} res 
+	 * @param {*} next 
+	 */
+	(req, res, next) => {
 		req.time = Date.now()
 		next()
-	})
-	_middlewares.push((req, res, next) => {
+	},
+	/**
+	 * remoteIp
+	 * @param {*} req 
+	 * @param {*} res 
+	 * @param {*} next 
+	 */
+	(req, res, next) => {
 		try {
 			req.remoteIp = (req.headers['x-real-ip'] ||
 				req.headers['x-forwarded-for'] ||
@@ -18,29 +25,38 @@ function Prepare() {
 				req.socket.remoteAddress ||
 				req.connection.socket.remoteAddress).split(",")[0]
 		} catch (error) {
-			console.warn(error)
+			//console.warn(error)
 		}
 		next()
-	})
-
-	_middlewares.push((req, res, next) => {
+	},
+	/**
+	 * protocol,pathname,hash,query
+	 * @param {*} req 
+	 * @param {*} res 
+	 * @param {*} next 
+	 */
+	(req, res, next) => {
 		const u = new URL(req.url, `http://${req.headers.host}`)
 		try {
 			req.protocol = u.protocol
 			req.pathname = u.pathname
 			req.hash = u.hash
 			req.query = {}
-			u.searchParams.forEach((value, name)=>{
+			u.searchParams.forEach((value, name) => {
 				req.query[name] = value
-				console.log(value)
 			})
 		} catch (error) {
-			console.warn(error.message)
+			//console.warn(error.message)
 		}
 		next()
-	})
-
-	_middlewares.push((req, res, next) => {
+	},
+	/**
+	 * cookie
+	 * @param {*} req 
+	 * @param {*} res 
+	 * @param {*} next 
+	 */
+	(req, res, next) => {
 		req.cookie = {}
 		if (req.headers.cookie) {
 			req.headers.cookie.split(';').forEach(cookie => {
@@ -49,8 +65,8 @@ function Prepare() {
 			});
 		}
 		next()
-	})
-}
+	}
+]
 
 async function Work(request, responce) {
 	responce.cookie = {}
@@ -68,18 +84,20 @@ async function Work(request, responce) {
 	let str = ""
 	try {
 		const result = await handler(request, responce)
-		if(!result)
+		if (!result) {
+			responce.writeHead(200, { 'Content-type': 'application/json' })
+			responce.end()
 			return
+		}
 		str = JSON.stringify(result)
 	} catch (error) {
-		console.warn(error)
+		//console.warn(error)
 		str = "{}"
 	}
 	WebServer.SetCookies(responce.cookie, responce)
 	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 	responce.writeHead(200, { 'Content-type': 'application/json' })
 	responce.end(str)
-	//console.log(`Request by ${Date.now() - request.time} msec`)
 }
 
 async function OnRequest(request, responce) {
@@ -98,6 +116,9 @@ async function OnRequest(request, responce) {
 	})
 }
 
+let _server = http.createServer(OnRequest)
+let _routes = {}
+
 /**
  * Include only public methods
  */
@@ -107,10 +128,9 @@ class WebServer {
 	 * Start server
 	 * @param {*} port 
 	 */
-	static Run(port) {
-		//if (_server) WebServer.Stop()		
-		_server = http.createServer(OnRequest)
-		_server.on("error", e => console.warn(e.message))
+	static Run(port, onerror) {
+		//if (_server) WebServer.Stop()	
+		_server.on("error", onerror ? onerror : (e) => console.warn(e.message))
 		_server.listen(port)
 	}
 
@@ -119,7 +139,7 @@ class WebServer {
 	 * @param {*} values {httpOnly:'true',duration:0,value:'cookievalue'}
 	 * @param {*} response 
 	 */
-	static SetCookies(values={}, response) {
+	static SetCookies(values = {}, response) {
 		const cookies = []
 		Object.keys(values).forEach(k => {
 			const info = values[k]
@@ -141,15 +161,15 @@ class WebServer {
 	static Stop() {
 		if (_server)
 			_server.close()
-		_middlewares.length=0
+		_middlewares.length = 0
 	}
 
 	/**
 	 * 
 	 * @param {Function} handler (req,res,next) 
 	 */
-	 static Use(handler,first=true) {
-		_middlewares[first?'unshift':'push'](handler)
+	static Use(handler, first = true) {
+		_middlewares[first ? 'unshift' : 'push'](handler)
 	}
 	/**
 	 * 
@@ -171,7 +191,5 @@ class WebServer {
 		_routes[key] = handler
 	}
 }
-
-Prepare()
 
 export default WebServer
