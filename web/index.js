@@ -84,9 +84,8 @@ async function Work(request, responce) {
 	let str = ""
 	try {
 		const result = await handler(request, responce)
+		//if no result - handler must set responce by self !!!
 		if (!result) {
-			responce.writeHead(200, { 'Content-type': 'application/json' })
-			responce.end()
 			return
 		}
 		str = JSON.stringify(result)
