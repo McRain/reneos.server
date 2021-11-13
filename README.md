@@ -3,12 +3,14 @@ https://github.com/McRain/reneos.server
 
 WsServer - Wrapper for ws package - added convenient pre-authorization support, sub-protocol implementation, network callbacks implemented
 
+
 ## Install
 
 ```npm i @reneos/server```
 
 ## Usage WebSocket
 
+WsServer - Wrapper for ws package - added convenient pre-authorization support, sub-protocol implementation, network callbacks implemented
 
 ```js
 import { WsServer } from "@reneos/server"

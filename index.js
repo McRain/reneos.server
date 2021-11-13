@@ -1,2 +1,2 @@
-export {default as WebServer} from "./webserver.js"
-export {default as WsServer} from "./wsserver.js"
+export {default as WebServer} from "./web/index.js"
+export {default as WsServer} from "./ws/index.js"
