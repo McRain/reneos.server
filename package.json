@@ -1,6 +1,6 @@
 {
 	"name": "@reneos/server",
-	"version": "0.0.24",
+	"version": "0.1.1",
 	"description": "Simple servers (HTTP, WebSocket)",
 	"main": "index.js",
 	"type": "module",
@@ -19,5 +19,9 @@
 	],
 	"dependencies": {
 		"ws": "^8.2.3"
+	},
+	"repository": {
+		"type": "git",
+    "url": "https://github.com/McRain/reneos.server.git"
 	}
 }

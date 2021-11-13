@@ -1,75 +1,14 @@
 import http from "http"
+import Workers from './preworkers.js'
 
-const _middlewares = [
-	/**
-	 * time
-	 * @param {*} req 
-	 * @param {*} res 
-	 * @param {*} next 
-	 */
-	(req, res, next) => {
-		req.time = Date.now()
-		next()
-	},
-	/**
-	 * remoteIp
-	 * @param {*} req 
-	 * @param {*} res 
-	 * @param {*} next 
-	 */
-	(req, res, next) => {
-		try {
-			req.remoteIp = (req.headers['x-real-ip'] ||
-				req.headers['x-forwarded-for'] ||
-				req.connection.remoteAddress ||
-				req.socket.remoteAddress ||
-				req.connection.socket.remoteAddress).split(",")[0]
-		} catch (error) {
-			//console.warn(error)
-		}
-		next()
-	},
-	/**
-	 * protocol,pathname,hash,query
-	 * @param {*} req 
-	 * @param {*} res 
-	 * @param {*} next 
-	 */
-	(req, res, next) => {
-		const u = new URL(req.url, `http://${req.headers.host}`)
-		try {
-			req.protocol = u.protocol
-			req.pathname = u.pathname
-			req.hash = u.hash
-			req.query = {}
-			u.searchParams.forEach((value, name) => {
-				req.query[name] = value
-			})
-		} catch (error) {
-			//console.warn(error.message)
-		}
-		next()
-	},
-	/**
-	 * cookie
-	 * @param {*} req 
-	 * @param {*} res 
-	 * @param {*} next 
-	 */
-	(req, res, next) => {
-		req.cookie = {}
-		if (req.headers.cookie) {
-			req.headers.cookie.split(';').forEach(cookie => {
-				const line = cookie.split('=');
-				req.cookie[line.shift().trim()] = decodeURI(line.join('='));
-			});
-		}
-		next()
-	}
-]
+const ToMsec = 1000000
+const _middlewares = []
+
+let _config = {	multiroutes: false }
+let _routes = {}
+let _wroker
 
 async function Work(request, responce) {
-	responce.cookie = {}
 	const mwh = i => {
 		if (i < _middlewares.length) {
 			const h = _middlewares[i]
@@ -77,6 +16,7 @@ async function Work(request, responce) {
 		}
 	}
 	mwh(0)
+
 	const handler = _routes[request.pathname] || _routes["*"] || _routes[""]
 	if (!handler) {
 		return WebServer.Return404(responce)
@@ -98,11 +38,57 @@ async function Work(request, responce) {
 	responce.writeHead(200, { 'Content-type': 'application/json' })
 	responce.end(str)
 }
+async function Works(request, responce) {
+	const mwh = i => {
+		if (i < _middlewares.length) {
+			const h = _middlewares[i]
+			h(request, responce, mwh.bind(null, ++i))
+		}
+	}
+	mwh(0)
+	const paths = request.pathname.split('/').filter(p=>p.length>0)
+	const handlers = []
+	let p = `/`
+	for (let i = 0; i < paths.length; i++) {
+		p += paths[i]
+		const hs = Object.keys(_routes)
+			.filter(r => (r === p || r === `${p}*` || r === `${p}/` || r === `${p}/*`))
+			.sort()
+			.map(r => _routes[r])
+		handlers.push(...hs)
+		p += '/'
+	}
+	let results
+	for (let i = 0; i < handlers.length; i++) {
+		try {
+			results = await handlers[i](request, responce, results)
+		} catch (error) {
+			console.warn(error)
+			break
+		}
+	}
+	//console.log(getMsTime(request.hrtime))
+	if (!results)
+		return
+	WebServer.SetCookies(responce.cookie, responce)
+	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+	responce.writeHead(200, { 'Content-type': 'application/json' })
+	responce.end(JSON.stringify(results))
+}
 
-async function OnRequest(request, responce) {
+/**
+ * Http request handler
+ * @param {*} request 
+ * @param {*} responce 
+ * @returns 
+ */
+function OnRequest(request, responce) {
 	request.body = {}
-	if (request.method === 'GET')
-		return await Work(request, responce)
+	responce.cookie = {}
+	Workers.forEach(m => m(request, responce))	
+	if (request.method === "GET") {
+		return _wroker(request, responce)
+	}
 	let data = ''
 	request.on('data', chunk => data += chunk)
 	request.on('end', () => {
@@ -111,28 +97,34 @@ async function OnRequest(request, responce) {
 		} catch (error) {
 			request.body = {}
 		}
-		Work(request, responce)
+		_wroker(request, responce)
 	})
 }
 
-let _server = http.createServer(OnRequest)
-let _routes = {}
+function getMsTime(from) {
+	const t = process.hrtime(from)
+	return (t[0] * 1e9 + t[1]) / ToMsec
+}
 
+let _server = http.createServer(OnRequest)
 /**
  * Include only public methods
  */
 class WebServer {
-
 	/**
 	 * Start server
 	 * @param {*} port 
 	 */
-	static Run(port, onerror) {
-		//if (_server) WebServer.Stop()	
-		_server.on("error", onerror ? onerror : (e) => console.warn(e.message))
+	static Run(port, options = {}, onerror) {
+		if (typeof options === 'function') {
+			_server.on("error", options)
+		} else {
+			_config = { ..._config, ...options }
+			_server.on("error", onerror ? onerror : e => console.warn(e.message))
+		}
+		_wroker = _config.multiroutes ? Works : Work
 		_server.listen(port)
 	}
-
 	/**
 	 * 
 	 * @param {*} values {httpOnly:'true',duration:0,value:'cookievalue'}
@@ -151,18 +143,18 @@ class WebServer {
 		response.setHeader('Cookie', cookies)
 		response.setHeader('Set-Cookie', cookies)
 	}
-
 	static Return404(responce) {
 		responce.writeHead(404)
 		responce.end()
 	}
-
+	/**
+	 * Stop web server and clear middlewares
+	 */
 	static Stop() {
 		if (_server)
 			_server.close()
 		_middlewares.length = 0
 	}
-
 	/**
 	 * 
 	 * @param {Function} handler (req,res,next) 
@@ -175,20 +167,15 @@ class WebServer {
 	 * @param {Object} obj {"/path",(req,res)=>{return {} }}
 	 */
 	static AddRoutes(obj) {
-		Object.keys(obj).forEach(k => {
-			_routes[k] = obj[k]
-		})
+		Object.keys(obj).forEach(k => _routes[k] = obj[k])
 	}
-
 	/**
 	 * 
 	 * @param {string} key - route 
 	 * @param {Function} handler async (req,res)=>{ return {} }
-	 * @param {Object} options : {auth:{"jwt":(req,res,next)=>{ next() } }}
 	 */
-	static AddRoute(key, handler, options) {
+	static AddRoute(key, handler) {
 		_routes[key] = handler
 	}
 }
-
 export default WebServer

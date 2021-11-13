@@ -1,13 +1,16 @@
 import http from "http"
-import querystring from "querystring"
 import { EventEmitter } from "events"
 
 import { WebSocketServer } from "ws"
 
-import * as Protocols from './protocols/index.js'
+import {Generate} from "../tools.js"
+import Connection from "./connection.js"
 
-const _clientOptions = {
-	binary: false, mask: false
+import WsClient from './client.js'
+
+const _config = {
+	port: 8999,
+	protocol: "http"
 }
 
 class Server extends EventEmitter {
@@ -20,31 +23,17 @@ class Server extends EventEmitter {
 		return this.connections.length
 	}
 
+	static get Client(){
+		return WsClient
+	}
+
 	constructor() {
 		super()
 		this.config = {
-			port: 8999,
-			protocol: "http"
+			..._config
 		}
-		this.protocol = {}
 		this.connections = []
-	}
-
-	allow(request, socket, head) {
-		return Server.GenId(32)
-	}
-
-	start(config, verify) {
-
-		this.protocol = Protocols[config.protocol || 'json']
-
-		this.verify = verify || this.allow
-
-		this.config = {
-			port: 8999,
-			protocol: "http",
-			...config
-		}
+		this.verify = this.allow
 
 		this.server = http.createServer()
 		this.server.on("error", e => console.warn(e.message))
@@ -59,14 +48,41 @@ class Server extends EventEmitter {
 		this.ws.on('listening', this.emit.bind(this, "listening"))
 
 		this.server.on('upgrade', this.Upgrade.bind(this))
+	}
+
+
+	start({port,protocol}, verify) {
+		if(typeof verify === "function")
+			this.verify = verify
+		this.config = {
+			..._config,
+			port,protocol
+		}
+		
 		this.server.listen(this.config.port)
 
 		return this
 	}
 
+	//#region  Private
+
+	allow(request, socket, head) {
+		return Generate(32)
+	}
+
+	/**
+	 * 
+	 * @param {*} request 
+	 * @param {*} socket 
+	 * @param {*} head 
+	 * @returns 
+	 */
 	async Upgrade(request, socket, head) {
 		const u = new URL(request.url, `${this.config.protocol}://${request.headers.host}`)
-		request.query = querystring.parse(u.search.slice(1))
+		request.query = {}
+		for(const [key,value] of u.searchParams.entries()) {
+			request.query[key] = value
+	 	}
 		//internal or external verify	
 		const id = await this.verify(request, socket, head)
 		if (!id) {
@@ -85,10 +101,12 @@ class Server extends EventEmitter {
 		if (old) {
 			old.client.close()
 		}
-		const conn = new Connection(ws, id, this.protocol.encode)
+		const conn = new Connection(ws, id)
+
 		ws.on("error", this.emit.bind(this, "error", conn))
 		ws.on("message", this.onMessage.bind(this, conn));
 		ws.on("close", this.onClose.bind(this, conn))
+		ws.on("pong", ()=>ws.isAlive = true)
 
 		this.connections.push(conn)
 
@@ -103,14 +121,12 @@ class Server extends EventEmitter {
 	}
 
 	async onMessage(conn, msg) {
-		const { decode } = this.protocol
-		try {
-			const message = await decode({}, msg, conn.id)
-			this.emit("message", message, conn.id);
-		} catch (error) {
-			this.emit('message', msg, conn.id)
-		}
+		this.emit("message", msg, conn.id);
 	}
+
+	//#endregion
+
+
 
 	/**
 	 * Searches for connections with required parameters
@@ -172,6 +188,14 @@ class Server extends EventEmitter {
 	sendToAll(data) {
 		this.connections.forEach(c => c.send(data))
 	}
+	ping(){
+		this.connections.forEach(c=> {
+			if (c?.client?.isAlive === false) 
+				return c.close(true)
+			c.client.isAlive = false
+			c.client.ping();
+		});
+	}
 	/**
 	 * 
 	 * @param {*} data :Buffer or string
@@ -192,74 +216,6 @@ class Server extends EventEmitter {
 				t.send(data)
 			} catch (error) {
 				console.warn(error)
-			}
-		}
-	}
-
-	static GenId(len = 12) {
-		const sym = "ABCDEFGHIKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890";
-		let str = "";
-		for (let i = 0; i < len; i++)
-			str += sym[Math.floor(Math.random() * sym.length)]
-		return str;
-	}
-}
-
-class Connection extends EventEmitter {
-	/**
-	 * 
-	 * @param {*} ws - Client socket
-	 * @param {*} connId Unique id for this connection
-	 */
-	constructor(ws, id, encode) {
-		super()
-		this.id = id
-		this.client = ws
-		this.callbacks = []
-		this.encoder = encode
-	}
-
-	close() {
-		this.client.close()
-	}
-
-	get ready() {
-		return this.client !== null && this.client.readyState === 1
-	}
-
-	addCallback(msgId, cb) {
-		this.callbacks.push({
-			callback: cb,
-			id: msgId,
-			time: Date.now()
-		})
-	}
-
-	getCallback(msgId) {
-		return this.callbacks.find(c => c.id === msgId)
-	}
-
-	getCallbacks(backTimeMs) {
-		const dn = Date.now() - backTimeMs
-		return this.callbacks.find(c => c.time < dn)
-	}
-
-	removeCallback(msgId) {
-		this.callbacks = this.callbacks.filter(c => c.id !== msgId)
-	}
-
-	clean(backTimeMs) {
-		const dn = Date.now() - backTimeMs
-		this.callbacks = this.callbacks.filter(c => c.time >= dn)
-	}
-
-	async send(value) {
-		if (this.client !== null && this.client.readyState === 1/*WebSocket.OPEN*/) {
-			try {
-				const msg = await this.encoder(value, this.id)
-				this.client.send(msg, _clientOptions, () => { });
-			} catch (e) {
-				this.emit('error', e)
 			}
 		}
 	}
