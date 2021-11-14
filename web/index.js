@@ -7,38 +7,6 @@ const _middlewares = []
 let _config = {	multiroutes: false }
 let _routes = {}
 
-/*
-async function Work(request, responce) {
-	const mwh = i => {
-		if (i < _middlewares.length) {
-			const h = _middlewares[i]
-			h(request, responce, mwh.bind(null, ++i))
-		}
-	}
-	mwh(0)
-
-	const handler = _routes[request.pathname] || _routes["*"] || _routes[""]
-	if (!handler) {
-		return WebServer.Return404(responce)
-	}
-	let str = ""
-	try {
-		const result = await handler(request, responce)
-		//if no result - handler must set responce by self !!!
-		if (!result) {
-			return
-		}
-		str = JSON.stringify(result)
-	} catch (error) {
-		//console.warn(error)
-		str = "{}"
-	}
-	WebServer.SetCookies(responce.cookie, responce)
-	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-	responce.writeHead(200, { 'Content-type': 'application/json' })
-	responce.end(str)
-}*/
-
 async function Works(request, responce) {
 	const mwh = i => {
 		if (i < _middlewares.length) {
