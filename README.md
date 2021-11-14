@@ -3,6 +3,7 @@ https://github.com/McRain/reneos.server
 
 This package is designed to quickly launch lightweight servers (http or websocket).
 
+npm https://www.npmjs.com/package/@reneos/server
 
 ## Install
 
