@@ -6,8 +6,8 @@ const _middlewares = []
 
 let _config = {	multiroutes: false }
 let _routes = {}
-let _wroker
 
+/*
 async function Work(request, responce) {
 	const mwh = i => {
 		if (i < _middlewares.length) {
@@ -37,7 +37,8 @@ async function Work(request, responce) {
 	responce.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
 	responce.writeHead(200, { 'Content-type': 'application/json' })
 	responce.end(str)
-}
+}*/
+
 async function Works(request, responce) {
 	const mwh = i => {
 		if (i < _middlewares.length) {
@@ -52,12 +53,15 @@ async function Works(request, responce) {
 	for (let i = 0; i < paths.length; i++) {
 		p += paths[i]
 		const hs = Object.keys(_routes)
-			.filter(r => (r === p || r === `${p}*` || r === `${p}/` || r === `${p}/*`))
+			.filter(r => r===`${p}/*`)
 			.sort()
 			.map(r => _routes[r])
 		handlers.push(...hs)
 		p += '/'
 	}
+	const targetRoute = _routes[request.pathname]
+	if (targetRoute)
+		handlers.push(targetRoute)
 	let results
 	for (let i = 0; i < handlers.length; i++) {
 		try {
@@ -87,7 +91,7 @@ function OnRequest(request, responce) {
 	responce.cookie = {}
 	Workers.forEach(m => m(request, responce))	
 	if (request.method === "GET") {
-		return _wroker(request, responce)
+		return Works(request, responce)
 	}
 	let data = ''
 	request.on('data', chunk => data += chunk)
@@ -97,7 +101,7 @@ function OnRequest(request, responce) {
 		} catch (error) {
 			request.body = {}
 		}
-		_wroker(request, responce)
+		Works(request, responce)
 	})
 }
 
@@ -122,7 +126,6 @@ class WebServer {
 			_config = { ..._config, ...options }
 			_server.on("error", onerror ? onerror : e => console.warn(e.message))
 		}
-		_wroker = _config.multiroutes ? Works : Work
 		_server.listen(port)
 	}
 	/**
