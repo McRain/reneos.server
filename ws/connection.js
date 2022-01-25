@@ -5,6 +5,11 @@ const _clientOptions = {
 }
 
 class Connection extends EventEmitter {
+
+	static SetOptions(key,value){
+		_clientOptions[key] = value
+	}
+	
 	/**
 	 * 
 	 * @param {*} ws - Client socket

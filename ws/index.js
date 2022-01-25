@@ -3,14 +3,15 @@ import { EventEmitter } from "events"
 
 import { WebSocketServer } from "ws"
 
-import {Generate} from "../tools.js"
+import { Generate } from "../tools.js"
 import Connection from "./connection.js"
 
 import WsClient from './client.js'
 
 const _config = {
 	port: 8999,
-	protocol: "http"
+	protocol: "http",
+	single: false
 }
 
 class Server extends EventEmitter {
@@ -23,7 +24,11 @@ class Server extends EventEmitter {
 		return this.connections.length
 	}
 
-	static get Client(){
+	static get Connection(){
+		return Connection
+	}
+
+	static get Client() {
 		return WsClient
 	}
 
@@ -51,14 +56,14 @@ class Server extends EventEmitter {
 	}
 
 
-	start({port,protocol}, verify) {
-		if(typeof verify === "function")
+	start({ port, protocol, single }, verify) {
+		if (typeof verify === "function")
 			this.verify = verify
 		this.config = {
 			..._config,
-			port,protocol
+			port, protocol, single
 		}
-		
+
 		this.server.listen(this.config.port)
 
 		return this
@@ -80,9 +85,9 @@ class Server extends EventEmitter {
 	async Upgrade(request, socket, head) {
 		const u = new URL(request.url, `${this.config.protocol}://${request.headers.host}`)
 		request.query = {}
-		for(const [key,value] of u.searchParams.entries()) {
+		for (const [key, value] of u.searchParams.entries()) {
 			request.query[key] = value
-	 	}
+		}
 		//internal or external verify	
 		const id = await this.verify(request, socket, head)
 		if (!id) {
@@ -106,7 +111,7 @@ class Server extends EventEmitter {
 		ws.on("error", this.emit.bind(this, "error", conn))
 		ws.on("message", this.onMessage.bind(this, conn));
 		ws.on("close", this.onClose.bind(this, conn))
-		ws.on("pong", ()=>ws.isAlive = true)
+		ws.on("pong", () => ws.isAlive = true)
 
 		this.connections.push(conn)
 
@@ -188,9 +193,9 @@ class Server extends EventEmitter {
 	sendToAll(data) {
 		this.connections.forEach(c => c.send(data))
 	}
-	ping(){
-		this.connections.forEach(c=> {
-			if (c?.client?.isAlive === false) 
+	ping() {
+		this.connections.forEach(c => {
+			if (c?.client?.isAlive === false)
 				return c.close(true)
 			c.client.isAlive = false
 			c.client.ping();
