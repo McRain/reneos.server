@@ -7,14 +7,20 @@ const _middlewares = []
 let _config = {	multiroutes: false }
 let _routes = {}
 
-async function Works(request, responce) {
-	const mwh = i => {
-		if (i < _middlewares.length) {
+function Execute(request, responce) {
+	if(_middlewares.length>0){
+		const mwh = i => {
 			const h = _middlewares[i]
-			h(request, responce, mwh.bind(null, ++i))
+			const f = i === _middlewares.length - 1 ? Works.bind(null,request, responce) : mwh.bind(null, ++i)		
+			h(request, responce, f)
 		}
+		mwh(0)
+	}else{
+		Works(request, responce)
 	}
-	mwh(0)
+}
+
+async function Works(request, responce) {
 	const paths = request.pathname.split('/').filter(p=>p.length>0)
 	const handlers = []
 	let p = `/`
@@ -39,7 +45,6 @@ async function Works(request, responce) {
 			break
 		}
 	}
-	//console.log(getMsTime(request.hrtime))
 	if (!results)
 		return
 	WebServer.SetCookies(responce.cookie, responce)
@@ -57,9 +62,11 @@ async function Works(request, responce) {
 function OnRequest(request, responce) {
 	request.body = {}
 	responce.cookie = {}
+
 	Workers.forEach(m => m(request, responce))	
+	
 	if (request.method === "GET") {
-		return Works(request, responce)
+		return Execute(request, responce)
 	}
 	let data = ''
 	request.on('data', chunk => data += chunk)
@@ -69,7 +76,7 @@ function OnRequest(request, responce) {
 		} catch (error) {
 			request.body = {}
 		}
-		Works(request, responce)
+		Execute(request, responce)
 	})
 }
 

@@ -122,7 +122,7 @@ class Server extends EventEmitter {
 		const index = this.connections.indexOf(conn)
 		if (index >= 0)
 			this.connections.splice(index, 1)
-		this.emit("disconnect", conn.id, code, reason)
+		this.emit("disconnect", conn.id, code, reason,conn)
 	}
 
 	async onMessage(conn, msg) {
@@ -145,6 +145,10 @@ class Server extends EventEmitter {
 			})
 			return true
 		})
+	}
+
+	getConnection(id){
+		return this.connections.find(c=>c.id===id)
 	}
 
 	closeConnection(target) {
