@@ -1,6 +1,6 @@
 import http from "http"
 
-class WebServer {
+class Server {
     constructor(port) {
         this.port = port
         this.middlewares = [(req, res, next) => {
@@ -116,4 +116,4 @@ class WebServer {
 
 }
 
-export default WebServer
+export default Server
