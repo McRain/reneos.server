@@ -1,11 +1,13 @@
 {
 	"name": "@reneos/server",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "Simple servers (HTTP, WebSocket)",
 	"main": "index.js",
 	"type": "module",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "test",
+		"webserver":"node ./examples/web.js",
+		"webserver_static":"node ./examples/web_stat.js"
 	},
 	"author": {
 		"name": "Viktor Abdulov",
@@ -18,10 +20,10 @@
 		"server"
 	],
 	"dependencies": {
-		"ws": "8.8.1"
+		"ws": "8.14.2"
 	},
 	"repository": {
 		"type": "git",
-    	"url": "https://github.com/McRain/reneos.server.git"
+		"url": "https://github.com/McRain/reneos.server.git"
 	}
 }
