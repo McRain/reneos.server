@@ -8,13 +8,6 @@ const _middlewares = [
         req.cookie[line.shift().trim()] = decodeURI(line.join('='));
       });
     }
-  },
-  (req,res)=>{
-    try {
-      req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
-    } catch (error) {
-      req.body = {}
-    }
   }
 ]
 const _routes = {}
@@ -83,11 +76,13 @@ class StaticServer {
     }
   }
 
-  static async OnRequest(req, res) {
-    req.cookie = {}
-    res.cookie = {}
+  static OnRequest(req, res) {
+    req.cookie = {}    
     req.body = {}
+    req.query = {}
     req.time = process.hrtime()
+    res.cookie = {}
+
     const end = res.writeHead
     res.writeHead = (...args) => {
       const cookies = []
@@ -107,21 +102,24 @@ class StaticServer {
 
       end.apply(res, args)
     }
-
+    console.log(req.url)
     let data = ''
     req.on('data', chunk => data += chunk)
-    req.on('end', () => {
+    req.on('end', async () => {
+      try {
+        req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
+      } catch (error) {
+        req.body = {}
+      }
       for (let i = 0; i < _middlewares.length; i++) {
         try {
-          _middlewares[i](req, res)
+          await _middlewares[i](req, res)
         } catch (error) {
           return
         }
       }
       StaticServer.Works(req, res)
     })
-
-
 
     /*for (const middleware of _middlewares) {
       try {

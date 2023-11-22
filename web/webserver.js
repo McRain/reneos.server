@@ -90,9 +90,10 @@ class Server {
 
     handle(req, res) {
         req.cookie = {}
-        res.cookie = {}
         req.body = {}
+        req.query = {}
         req.time = process.hrtime()
+        res.cookie = {}
 
         const end = res.writeHead
         res.writeHead = (...args) => {
@@ -116,6 +117,11 @@ class Server {
         let data = ''
         req.on('data', chunk => data += chunk)
         req.on('end', async () => {
+            try {
+                req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
+            } catch (error) {
+                req.body = {}
+            }
             for (let i = 0; i < this.middlewares.length; i++) {
                 try {
                     await this.middlewares[i](req, res)
