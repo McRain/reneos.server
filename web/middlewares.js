@@ -1,6 +1,6 @@
 
 export default {
-    "remoteip": (req, res,next) => {
+    "remoteip": (req, res) => {
         try {
             req.remoteIp = (req.headers['x-real-ip'] ||
                 req.headers['x-forwarded-for'] ||
@@ -10,10 +10,8 @@ export default {
         } catch (error) {
             //console.warn(error)
         }
-        if(next)
-            next()
     },
-    "urldata": (req, res,next) => {
+    "urldata": (req, res) => {
         const u = new URL(req.url, `http://${req.headers.host}`)
         try {
             req.protocol = u.protocol
@@ -26,6 +24,5 @@ export default {
         } catch (error) {
             //console.warn(error.message)
         }
-        next()
     }
 }

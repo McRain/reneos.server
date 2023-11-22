@@ -10,6 +10,8 @@ StaticServer.Use((req, res) => {
   
   StaticServer.AddRoute('', async (req, res) => {
     console.log(req.time)
+    console.log(req.body)
+    console.log(req.cookie)
   }, "GET");
 
   // Adding route handlers
@@ -26,7 +28,7 @@ StaticServer.Use((req, res) => {
   });
   
   StaticServer.AddRoute('/about/', async (req, res) => {
-    //console.log(req.cookie)
+    console.log(req.cookie)
     console.log(req.remoteIp)
   });
 

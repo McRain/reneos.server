@@ -1,12 +1,19 @@
 import http from "http"
 
 const _middlewares = [
-  (req, res) => {   
+  (req, res) => {
     if (req.headers.cookie) {
       req.headers.cookie.split(';').forEach(cookie => {
         const line = cookie.split('=');
         req.cookie[line.shift().trim()] = decodeURI(line.join('='));
       });
+    }
+  },
+  (req,res)=>{
+    try {
+      req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
+    } catch (error) {
+      req.body = {}
     }
   }
 ]
@@ -62,7 +69,7 @@ class StaticServer {
       }
     }
 
-    if (handlers.length === 0) {      
+    if (handlers.length === 0) {
       _standarts[404](req, res)
       return;
     }
@@ -79,6 +86,7 @@ class StaticServer {
   static async OnRequest(req, res) {
     req.cookie = {}
     res.cookie = {}
+    req.body = {}
     req.time = process.hrtime()
     const end = res.writeHead
     res.writeHead = (...args) => {
@@ -100,14 +108,19 @@ class StaticServer {
       end.apply(res, args)
     }
 
-    for (let i = 0; i < _middlewares.length; i++) {
-      try {
-        _middlewares[i](req, res)
-      } catch (error) {
-        return
+    let data = ''
+    req.on('data', chunk => data += chunk)
+    req.on('end', () => {
+      for (let i = 0; i < _middlewares.length; i++) {
+        try {
+          _middlewares[i](req, res)
+        } catch (error) {
+          return
+        }
       }
-    }
-    StaticServer.Works(req, res)
+      StaticServer.Works(req, res)
+    })
+
 
 
     /*for (const middleware of _middlewares) {

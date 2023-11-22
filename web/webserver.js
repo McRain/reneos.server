@@ -3,7 +3,7 @@ import http from "http"
 class Server {
     constructor(port) {
         this.port = port
-        this.middlewares = [(req, res, next) => {
+        this.middlewares = [(req, res) => {
             req.cookie = {}
             res.cookie = {}
             if (req.headers.cookie) {
@@ -12,7 +12,12 @@ class Server {
                     req.cookie[line.shift().trim()] = decodeURI(line.join('='));
                 });
             }
-            next()
+        }, (req, res) => {
+            try {
+                req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
+            } catch (error) {
+                req.body = {}
+            }
         }]
         this.routes = {}
         this.standarts = {
@@ -83,8 +88,12 @@ class Server {
         }
     }
 
-    async handle(req, res) {
+    handle(req, res) {
+        req.cookie = {}
+        res.cookie = {}
+        req.body = {}
         req.time = process.hrtime()
+
         const end = res.writeHead
         res.writeHead = (...args) => {
             const cookies = []
@@ -104,14 +113,18 @@ class Server {
             end.apply(res, args)
         }
 
-        const mwh = i => {
-            const h = this.middlewares[i]
-            const f = i === this.middlewares.length - 1 ? this.works.bind(this, req, res) : mwh.bind(this, ++i)
-            h(req, res, f)
-        }
-        mwh(0)
-
-
+        let data = ''
+        req.on('data', chunk => data += chunk)
+        req.on('end', async () => {
+            for (let i = 0; i < this.middlewares.length; i++) {
+                try {
+                    await this.middlewares[i](req, res)
+                } catch (error) {
+                    return
+                }
+            }
+            this.works(req, res)
+        })
     }
 
 }
