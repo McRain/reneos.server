@@ -54,7 +54,7 @@ class StaticServer {
     const handlers = []
     const url = req.url || ""
     const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    const routs = [normalizedUrl, `${normalizedUrl}/`]
+    const routs = ["*", normalizedUrl, `${normalizedUrl}/`]
     for (let i = 0; i < 2; i++) {
       const p = routs[i]
       if (_routes[p]) {
@@ -72,6 +72,7 @@ class StaticServer {
         handlers[i](req, res);
       }
     } catch (error) {
+      console.warn(error)
       _standarts[500](req, res)
     }
   }
@@ -102,7 +103,6 @@ class StaticServer {
 
       end.apply(res, args)
     }
-    console.log(req.url)
     let data = ''
     req.on('data', chunk => data += chunk)
     req.on('end', async () => {
@@ -120,41 +120,6 @@ class StaticServer {
       }
       StaticServer.Works(req, res)
     })
-
-    /*for (const middleware of _middlewares) {
-      try {
-        await middleware(req, res);
-      } catch (error) {
-        _standarts[500](req, res)
-      }
-    }
-
-    let handlers = []
-    const url = req.url || ""
-    const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-
-    const routs = [normalizedUrl, `${normalizedUrl}/`, `${normalizedUrl}/*`, `${normalizedUrl}*`]
-    for (let i = 0; i < 4; i++) {
-      const p = routs[i]
-      if (_routes[p]) {
-        const formethod = _routes[p][req.method] || []
-        const allmethod = _routes[p]['*'] || []
-        handlers.push(...formethod, ...allmethod)
-      }
-    }
-
-    if (handlers.length === 0) {
-      _standarts[404](req, res)
-      return;
-    }
-
-    try {
-      for (const handler of handlers) {
-        await handler(req, res);
-      }
-    } catch (error) {
-      _standarts[500](req, res)
-    }*/
 
   }
 }

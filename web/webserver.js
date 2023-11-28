@@ -62,7 +62,7 @@ class Server {
         let handlers = []
         const url = req.url || ""
         const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-        const routs = [normalizedUrl, `${normalizedUrl}/`]
+        const routs = ["*",normalizedUrl, `${normalizedUrl}/`]
         for (let i = 0; i < 2; i++) {
             const p = routs[i]
             if (this.routes[p]) {
