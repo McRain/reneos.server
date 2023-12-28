@@ -55,7 +55,7 @@ class StaticServer {
     const url = req.url || ""
     const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
     const routs = ["*", normalizedUrl, `${normalizedUrl}/`]
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const p = routs[i]
       if (_routes[p]) {
         handlers.push(..._routes[p][req.method] || [], ..._routes[p]['*'] || [])
