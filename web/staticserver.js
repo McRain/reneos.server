@@ -50,7 +50,21 @@ class StaticServer {
     _routes[path][method].push(handler);
   }
 
-  static Works(req, res) {
+  static SetCookies(values = {}, response) {
+    const cookies = []
+    Object.keys(values).forEach(k => {
+      const info = values[k]
+      let cook = `${k}=${info.value};httpOnly=${info.httpOnly || 'true'};Path=${info.path || '/'};`
+      if (info.duration) {
+        cook = `${cook}expires=${new Date(Date.now() + info.duration * 1000).toUTCString()};`
+      }
+      cookies.push(cook)
+    })
+    response.setHeader('Cookie', cookies)
+    response.setHeader('Set-Cookie', cookies)
+  }
+
+  static async Works(req, res) {
     const handlers = []
     const url = req.url || ""
     const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
@@ -66,19 +80,34 @@ class StaticServer {
       _standarts[404](req, res)
       return;
     }
+    let results = {}
     try {
       const cnt = handlers.length
       for (let i = 0; i < cnt; i++) {
-        handlers[i](req, res);
+        const result = await handlers[i](req, res, results)
+        if (typeof result === "object")
+          results = { ...results, ...result }
+        else if (typeof result === "string")
+          results = result
       }
     } catch (error) {
       console.warn(error)
       _standarts[500](req, res)
+      return
     }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if(typeof results ==="object"){
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(results));
+    }else{
+      res.writeHead(200);
+      res.end(results || "");
+    }
+    
   }
 
   static OnRequest(req, res) {
-    req.cookie = {}    
+    req.cookie = {}
     req.body = {}
     req.query = {}
     req.time = process.hrtime()

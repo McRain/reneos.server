@@ -8,23 +8,24 @@ StaticServer.Use((req, res) => {
   
   StaticServer.Use(Middlewares.remoteip)
   
-  StaticServer.AddRoute('', async (req, res) => {
+  StaticServer.AddRoute('', async (req, res,result) => {
     console.log(req.time)
     console.log(req.body)
     console.log(req.cookie)
+    return {
+      "key":"value"
+    }
   }, "GET");
 
   // Adding route handlers
-  StaticServer.AddRoute('/', async (req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' })
-    res.end('Hello, World!')
+  StaticServer.AddRoute('/', async (req, res,result) => {
+    return 'Hello, World!'
   }, "GET");
   
  
-  StaticServer.AddRoute('/about', async (req, res) => {
+  StaticServer.AddRoute('/about', async (req, res,result) => {
     res.cookie['my'] = {value:"OK",httpOnly:true,path:'/'}
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('About Us');
+    return ""
   });
   
   StaticServer.AddRoute('/about/', async (req, res) => {
