@@ -90,6 +90,9 @@ class WebServer {
                     results = { ...results, ...result }
                 else if (typeof result === "string")
                     results = result
+                else if(!result){
+                    results = result
+                }
             }
         } catch (error) {
             this.standarts[500](req, res)

@@ -1,6 +1,6 @@
 {
 	"name": "@reneos/server",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"description": "Simple servers (HTTP, WebSocket)",
 	"main": "index.js",
 	"type": "module",
@@ -20,7 +20,7 @@
 		"server"
 	],
 	"dependencies": {
-		"ws": "8.14.2"
+		"ws": "8.16.0"
 	},
 	"repository": {
 		"type": "git",
