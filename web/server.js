@@ -1,8 +1,11 @@
+import EventEmitter from "events"
 import http from "http"
 
-class Server {
-    constructor(port) {
-        this.port = port
+const _emmiter = new EventEmitter()
+
+class WebServer {
+    constructor() {
+        this.port = 80
         this.middlewares = [(req, res) => {
             req.cookie = {}
             res.cookie = {}
@@ -11,12 +14,6 @@ class Server {
                     const line = cookie.split('=');
                     req.cookie[line.shift().trim()] = decodeURI(line.join('='));
                 });
-            }
-        }, (req, res) => {
-            try {
-                req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
-            } catch (error) {
-                req.body = {}
             }
         }]
         this.routes = {}
@@ -31,6 +28,11 @@ class Server {
             }
         }
         this.server = http.createServer((req, res) => this.handle(req, res))
+    }
+
+    run(port) {
+        this.port = port
+        return this.listen()
     }
 
     use(handler, position) {
@@ -54,15 +56,15 @@ class Server {
 
     listen() {
         this.server.listen(this.port, () => {
-            console.log(`Server listening on port ${this.port}`);
-        });
+            _emmiter.emit('start')
+        })
     }
 
     async works(req, res) {
         let handlers = []
-        const url = req.url || ""
+        const url = req.path || ""
         const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-        const routs = ["*",normalizedUrl, `${normalizedUrl}/`]
+        const routs = ["*", normalizedUrl, `${normalizedUrl}/`]
         for (let i = 0; i < 3; i++) {
             const p = routs[i]
             if (this.routes[p]) {
@@ -78,24 +80,43 @@ class Server {
             res.time = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(2)
             return;
         }
+        let results = {}
         try {
             const cnt = handlers.length
             for (let i = 0; i < cnt; i++) {
-                handlers[i](req, res)
+                //handlers[i](req, res)
+                const result = await handlers[i](req, res, results)
+                if (typeof result === "object")
+                    results = { ...results, ...result }
+                else if (typeof result === "string")
+                    results = result
             }
         } catch (error) {
             this.standarts[500](req, res)
+            return
+        }
+        if (results === null || results === undefined) {
+            return
+        }
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        if (typeof results === "object") {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(results));
+        } else {
+            res.writeHead(200);
+            res.end(results || "");
         }
     }
 
     handle(req, res) {
-        req.cookie = {}
-        req.body = {}
-        req.query = {}
         req.time = process.hrtime()
         res.cookie = {}
 
+        const parsedUrl = new URL(req.url, `http://${req.headers.host}`)
+        req.path = parsedUrl.pathname
+        req.query = Object.fromEntries(parsedUrl.searchParams.entries());
         const end = res.writeHead
+
         res.writeHead = (...args) => {
             const cookies = []
             Object.keys(res.cookie).forEach(k => {
@@ -108,6 +129,7 @@ class Server {
             })
             res.setHeader('Cookie', cookies)
             res.setHeader('Set-Cookie', cookies)
+
             const endTime = process.hrtime(req.time)
             res.time = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(2)
 
@@ -120,13 +142,17 @@ class Server {
             try {
                 req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
             } catch (error) {
+                _emmiter.emit('error',error.message)
+                //console.warn(error.message)
                 req.body = {}
             }
             for (let i = 0; i < this.middlewares.length; i++) {
                 try {
                     await this.middlewares[i](req, res)
                 } catch (error) {
-                    return
+                    _emmiter.emit('error',error.message)
+                    //console.warn(error.message)
+                    continue
                 }
             }
             this.works(req, res)
@@ -135,4 +161,4 @@ class Server {
 
 }
 
-export default Server
+export default WebServer

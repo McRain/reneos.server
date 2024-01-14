@@ -104,5 +104,4 @@ dist
 .tern-port
 package-lock.json
 .vscode/
-web/_index.js
-web/_preworkers.js
+_web/*
