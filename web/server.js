@@ -1,5 +1,6 @@
 import EventEmitter from "events"
 import http from "http"
+import fs from "fs"
 
 const _emmiter = new EventEmitter()
 
@@ -15,6 +16,12 @@ class WebServer {
                     req.cookie[line.shift().trim()] = decodeURI(line.join('='));
                 });
             }
+        }, (req, res) => {
+            try {
+                req.body = JSON.parse(typeof req.data === 'string' ? req.data : req.data.toString('utf8'))
+            } catch (error) {
+                req.body = {}
+            }
         }]
         this.routes = {}
         this.standarts = {
@@ -27,7 +34,9 @@ class WebServer {
                 res.end('Internal Server Error');
             }
         }
-        this.server = http.createServer((req, res) => this.handle(req, res))
+        this.server = http.createServer(this.handle.bind(this))
+        this.root = null
+        this.allowExts = []
     }
 
     run(port) {
@@ -60,7 +69,36 @@ class WebServer {
         })
     }
 
+    streamFile(path, res) {
+        try {
+            const filePath = path.replace(/\.\./g, '')
+            const fileLocalPath = `${this.root}${filePath}`
+            const fileStream = fs.createReadStream(fileLocalPath)
+            const fileName = filePath.split('/').pop()
+            const fileStats = fs.statSync(fileLocalPath);
+            const fileSize = fileStats.size;
+            res.writeHead(200, {
+                'Content-Type': 'application/octet-stream',
+                'Content-Disposition': `attachment; filename=${fileName}`,
+                'Content-Length': fileSize.toString()
+            })
+            fileStream.pipe(res)
+            fileStream.on('end', () => res.end())
+            fileStream.on('error', (err) => {
+                console.warn("fileStream.on('error'");
+                console.warn(err);
+                res.statusCode = 500;
+                res.end('Internal Server Error')
+            })
+        } catch (error) {
+            console.warn(error)
+            return true
+        }
+        return true
+    }
+
     async works(req, res) {
+        await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
         let handlers = []
         const url = req.path || ""
         const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
@@ -73,8 +111,14 @@ class WebServer {
                     ...this.routes[p]['*'] || [])
             }
         }
-
         if (handlers.length === 0) {
+            //check files
+            const ext = url.split('.').pop()
+            if (this.allowExts.includes(ext) || this.allowExts.includes("*")) {
+                if (this.streamFile(normalizedUrl, res)) {
+                    return
+                }
+            }
             this.standarts[404](req, res)
             const endTime = process.hrtime(req.time)
             res.time = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(2)
@@ -90,7 +134,7 @@ class WebServer {
                     results = { ...results, ...result }
                 else if (typeof result === "string")
                     results = result
-                else if(!result){
+                else if (!result) {
                     results = result
                 }
             }
@@ -113,13 +157,12 @@ class WebServer {
 
     handle(req, res) {
         req.time = process.hrtime()
+        req.cookie = {}
         res.cookie = {}
-
         const parsedUrl = new URL(req.url, `http://${req.headers.host}`)
         req.path = parsedUrl.pathname
         req.query = Object.fromEntries(parsedUrl.searchParams.entries());
         const end = res.writeHead
-
         res.writeHead = (...args) => {
             const cookies = []
             Object.keys(res.cookie).forEach(k => {
@@ -138,26 +181,9 @@ class WebServer {
 
             end.apply(res, args)
         }
-
-        let data = ''
-        req.on('data', chunk => data += chunk)
-        req.on('end', async () => {
-            try {
-                req.body = JSON.parse(typeof data === 'string' ? data : data.toString('utf8'))
-            } catch (error) {
-                _emmiter.emit('error',error.message)
-                //console.warn(error.message)
-                req.body = {}
-            }
-            for (let i = 0; i < this.middlewares.length; i++) {
-                try {
-                    await this.middlewares[i](req, res)
-                } catch (error) {
-                    _emmiter.emit('error',error.message)
-                    //console.warn(error.message)
-                    continue
-                }
-            }
+        req.data = ''
+        req.on('data', chunk => req.data += chunk)
+        req.on('end', () => {
             this.works(req, res)
         })
     }

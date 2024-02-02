@@ -131,22 +131,6 @@ class Server extends EventEmitter {
 
 	//#endregion
 
-
-
-	/**
-	 * Searches for connections with required parameters
-	 * @param {*} filter 
-	 */
-	find(filter) {
-		return this.connections.filter(c => {
-			Object.keys(filter).forEach(k => {
-				if (c[k] !== filter[k])
-					return false
-			})
-			return true
-		})
-	}
-
 	getConnection(id){
 		return this.connections.find(c=>c.id===id)
 	}
@@ -161,41 +145,42 @@ class Server extends EventEmitter {
 	}
 
 	/**
-	 * 
-	 * @param {Object} filters :{id:'sadjhaksjdh'}
-	 * @returns 
+	 * Searches for connections with required parameters
+	 * if include===true - will return all connections that HAVE matching properties found
+	 * if include===false - will return all connections that do NOT HAVE matching properties
+	 * @param {*} filter 
+	 * @param {Boolean} include
 	 */
-	exclude(filter = {}) {
+	filter(values={},include=false){
 		return this.connections.filter(c => {
-			Object.keys(filter).forEach(k => {
-				if (c[k] === filter[k])
-					return false
-			})
-			return true
+			const keys = Object.keys(values)
+			for(let i=0;i<keys.length;i++){
+				const key = keys[i]
+				if (c[key] === values[key])
+					return include
+			}
+			return !include
 		})
 	}
 
 	/**
-	 * 
-	 * @param {*} data 
-	 * @param {*} excludes 
-	 */
-	write(data, excludes) {
-		const targets = this.exclude(excludes)
-		targets.forEach(c => c.send(data))
-	}
-
-	/**
-	 * 
+	 * Send a message to everyone except those listed 
 	 * @param {object} data 
 	 * @param {object} excludes key:value
 	 */
 	send(data, excludes) {
-		const targets = this.exclude(excludes)
+		const targets = this.filter(excludes,false)
 		targets.forEach(c => c.send(data))
 	}
-	sendToAll(data) {
-		this.connections.forEach(c => c.send(data))
+
+	/**
+	 * Sending a message to those specified in the list
+	 * @param {*} data 
+	 * @param {*} includes {id:'OnlyOne'}
+	 */
+	sendTo(data, includes) {
+		const targets = this.filter(includes,true)
+		targets.forEach(c => c.send(data))
 	}
 	ping() {
 		this.connections.forEach(c => {
@@ -205,29 +190,7 @@ class Server extends EventEmitter {
 			c.client.ping();
 		});
 	}
-	/**
-	 * 
-	 * @param {*} data :Buffer or string
-	 * @param {*} recivers 
-	 */
-	sendTo(data, recivers) {
-		for (let i = this.connections.length - 1; i >= 0; i--) {
-			const conn = this.connections[i]
-			if (recivers.includes(conn.id))
-				conn.send(data)
-		}
-	}
-
-	sendToOne(data, target) {
-		const t = this.connections.find(c => c.id === target)
-		if (t) {
-			try {
-				t.send(data)
-			} catch (error) {
-				console.warn(error)
-			}
-		}
-	}
+	
 }
 
 export default Server
