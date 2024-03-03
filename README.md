@@ -1,5 +1,5 @@
 # Simple Servers 
-https://github.com/McRain/reneos.server
+
 
 This package is designed to quickly launch lightweight servers (http or websocket).
 
@@ -53,25 +53,5 @@ _server.start({port:12345},Verify)
 
 ## Usage WebServer
 
-```js
-import { WebServer } from "@reneos/server"
-
-function Parser(req,res,next){
-    const headers = req.headers['x-user']
-		next()
-}
-
-async function Api(req,res){
-	res.cookie = {
-		key:'value
-	}
-	return {
-		result:true
-	}
-}
-
-WebServer.Use(Parser)
-WebServer.AddRoute('/api',Api)
-WebServer.Run(8080)
-```
+See usage examples in the /examples/ folder
 
