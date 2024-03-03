@@ -106,9 +106,17 @@ class WebServer {
         for (let i = 0; i < 3; i++) {
             const p = routs[i]
             if (this.routes[p]) {
+                const keys = Object.keys(this.routes[p])
+                for(let k=0;k<keys.length;k++){
+                    const key = keys[k]
+                    if(key.includes(req.method) || key==="*"){
+                        handlers.push(...this.routes[p][key])
+                    }
+                }
+                /*
                 handlers.push(
                     ...this.routes[p][req.method] || [],
-                    ...this.routes[p]['*'] || [])
+                    ...this.routes[p]['*'] || [])*/
             }
         }
         if (handlers.length === 0) {
