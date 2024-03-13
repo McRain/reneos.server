@@ -1,6 +1,7 @@
 import EventEmitter from "events"
 import http from "http"
 import fs from "fs"
+import path from 'path'
 
 const _emmiter = new EventEmitter()
 
@@ -53,14 +54,14 @@ class WebServer {
         this.standarts[code] = handler
     }
 
-    addRoute(path, handler, method = "*") {
-        if (!this.routes[path]) {
-            this.routes[path] = {};
+    addRoute(p, handler, method = "*") {
+        if (!this.routes[p]) {
+            this.routes[p] = {};
         }
-        if (!this.routes[path][method]) {
-            this.routes[path][method] = [];
+        if (!this.routes[p][method]) {
+            this.routes[p][method] = [];
         }
-        this.routes[path][method].push(handler);
+        this.routes[p][method].push(handler);
     }
 
     listen() {
@@ -69,19 +70,28 @@ class WebServer {
         })
     }
 
-    streamFile(path, res) {
+    streamFile(p, res) {
         try {
-            const filePath = path.replace(/\.\./g, '')
+            const filePath = p.replace(/\.\./g, '')
             const fileLocalPath = `${this.root}${filePath}`
+            if(!fs.existsSync(fileLocalPath)){
+                return false
+            }
+
+            const contentType = this.getContentType(fileLocalPath);
+
             const fileStream = fs.createReadStream(fileLocalPath)
             const fileName = filePath.split('/').pop()
             const fileStats = fs.statSync(fileLocalPath);
             const fileSize = fileStats.size;
-            res.writeHead(200, {
-                'Content-Type': 'application/octet-stream',
-                'Content-Disposition': `attachment; filename=${fileName}`,
+            const headers = {
+                'Content-Type':contentType,//'application/octet-stream',
                 'Content-Length': fileSize.toString()
-            })
+            }
+            if(contentType==='application/octet-stream'){
+                headers['Content-Disposition'] =  `attachment; filename=${fileName}`
+            }
+            res.writeHead(200, headers)
             fileStream.pipe(res)
             fileStream.on('end', () => res.end())
             fileStream.on('error', (err) => {
@@ -92,9 +102,30 @@ class WebServer {
             })
         } catch (error) {
             console.warn(error)
-            return true
+            return false
         }
         return true
+    }
+
+    getContentType(filePath) {
+        const extname = path.extname(filePath);
+        switch (extname) {
+            case '.html':
+                return 'text/html';
+            case '.css':
+                return 'text/css';
+            case '.js':
+                return 'text/javascript';
+            case '.json':
+                return 'application/json';
+            case '.png':
+                return 'image/png';
+            case '.jpg':
+            case '.jpeg':
+                return 'image/jpeg';
+            default:
+                return "application/octet-stream"//'text/plain';
+        }
     }
 
     async works(req, res) {
@@ -107,9 +138,9 @@ class WebServer {
             const p = routs[i]
             if (this.routes[p]) {
                 const keys = Object.keys(this.routes[p])
-                for(let k=0;k<keys.length;k++){
+                for (let k = 0; k < keys.length; k++) {
                     const key = keys[k]
-                    if(key.includes(req.method) || key==="*"){
+                    if (key.includes(req.method) || key === "*") {
                         handlers.push(...this.routes[p][key])
                     }
                 }
@@ -121,7 +152,13 @@ class WebServer {
         }
         if (handlers.length === 0) {
             //check files
-            const ext = url.split('.').pop()
+
+
+            const fileUrl = url.endsWith('/')?`${url}index.html`:url            
+            if (this.streamFile(fileUrl, res)) {
+                return
+            }
+            const ext = fileUrl.split('.').pop()
             if (this.allowExts.includes(ext) || this.allowExts.includes("*")) {
                 if (this.streamFile(normalizedUrl, res)) {
                     return
