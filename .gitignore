@@ -104,3 +104,4 @@ dist
 .tern-port
 .vscode/
 _web/*
+web/_files.js
