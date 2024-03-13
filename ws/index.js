@@ -168,7 +168,7 @@ class Server extends EventEmitter {
 	 * @param {object} data 
 	 * @param {object} excludes key:value
 	 */
-	send(data, excludes) {
+	send(data, excludes={}) {
 		const targets = this.filter(excludes,false)
 		targets.forEach(c => c.send(data))
 	}
