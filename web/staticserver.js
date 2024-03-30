@@ -33,7 +33,7 @@ class StaticServer{
 export default new Proxy(StaticServer, {
 	get(target, prop) {
 		if (target[prop] === undefined)
-			return _server(prop)
+			return _server[prop]
 		return target[prop]
 	}
 })
