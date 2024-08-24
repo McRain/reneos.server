@@ -5,6 +5,33 @@ import path from 'path'
 
 const _emmiter = new EventEmitter()
 
+function parseFileData(contentType, req) {
+    try {
+        const boundary = contentType.split('; ')[1].split('=')[1];
+        const parts = req.data.split(`--${boundary}`);
+        req.files = {}
+        parts.forEach(part => {
+            // Находим заголовок Content-Disposition, который содержит имя файла
+            const match = /Content-Disposition:.*filename="(.*)"/.exec(part);
+            if (match) {
+                // Найден файл
+                const fileName = match[1].trim();
+
+                // Ищем позицию начала данных файла
+                const start = part.indexOf('\r\n\r\n') + 4;
+
+                // Получаем данные файла и сохраняем его
+                const fileData = part.substring(start, part.length - 2); // Избегаем последнего boundary
+                req.files[fileName] = fileData
+                //const result = fs.writeFileSync(`./${fileName}`, fileData)
+                //console.log(result)
+            }
+        });
+    } catch (error) {
+        console.warn(error)
+    }
+}
+
 class WebServer {
     constructor() {
         this.port = 80
@@ -74,7 +101,7 @@ class WebServer {
         try {
             const filePath = p.replace(/\.\./g, '')
             const fileLocalPath = `${this.root}${filePath}`
-            if(!fs.existsSync(fileLocalPath)){
+            if (!fs.existsSync(fileLocalPath)) {
                 return false
             }
 
@@ -85,11 +112,11 @@ class WebServer {
             const fileStats = fs.statSync(fileLocalPath);
             const fileSize = fileStats.size;
             const headers = {
-                'Content-Type':contentType,//'application/octet-stream',
+                'Content-Type': contentType,//'application/octet-stream',
                 'Content-Length': fileSize.toString()
             }
-            if(contentType==='application/octet-stream'){
-                headers['Content-Disposition'] =  `attachment; filename=${fileName}`
+            if (contentType === 'application/octet-stream') {
+                headers['Content-Disposition'] = `attachment; filename=${fileName}`
             }
             res.writeHead(200, headers)
             fileStream.pipe(res)
@@ -129,8 +156,17 @@ class WebServer {
     }
 
     async works(req, res) {
-        await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
+        const result = await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
+        if (result.some(v => v.value === true))
+            return
         let handlers = []
+        const contentType = req.headers['content-type']
+        if (contentType) {
+            if (contentType.startsWith('multipart/form-data')) {
+                parseFileData(contentType, req)
+            }
+        }
+
         const url = req.path || ""
         const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
         const routs = ["*", normalizedUrl, `${normalizedUrl}/`]
@@ -154,7 +190,7 @@ class WebServer {
             //check files
 
 
-            const fileUrl = url.endsWith('/')?`${url}index.html`:url            
+            const fileUrl = url.endsWith('/') ? `${url}index.html` : url
             if (this.streamFile(fileUrl, res)) {
                 return
             }
@@ -190,8 +226,9 @@ class WebServer {
         if (results === null || results === undefined) {
             return
         }
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        
         if (typeof results === "object") {
+            //res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(results));
         } else {

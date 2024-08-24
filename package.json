@@ -1,13 +1,14 @@
 {
 	"name": "@reneos/server",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"description": "Simple servers (HTTP, WebSocket)",
-	"main": "index.js",
+	"main": "./src/index.js",
 	"type": "module",
 	"scripts": {
 		"test": "test",
-		"webserver":"node ./examples/web.js",
-		"webserver_static":"node ./examples/web_stat.js"
+		"build": "webpack --config webpack.config.js",
+		"webserver": "node ./examples/web.js",
+		"webserver_static": "node ./examples/web_stat.js"
 	},
 	"author": {
 		"name": "Viktor Abdulov",
@@ -20,7 +21,7 @@
 		"server"
 	],
 	"dependencies": {
-		"ws": "8.16.0"
+		"ws": "8.18.0"
 	},
 	"repository": {
 		"type": "git",
