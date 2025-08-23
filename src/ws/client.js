@@ -2,6 +2,9 @@ import {EventEmitter} from "events"
 
 import WebSocket from "ws"
 
+/**
+ * Подключение со стороны клиента
+ */
 class Client extends EventEmitter{
 	get id(){
 		return this._id

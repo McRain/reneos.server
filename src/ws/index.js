@@ -10,7 +10,7 @@ import WsClient from './client.js'
 
 const _config = {
 	port: 8999,
-	protocol: "http",
+	protocol: "ws",
 	single: false
 }
 
@@ -21,7 +21,7 @@ class Server extends EventEmitter {
 	}
 
 	get count() {
-		return this.connections.length
+		return Object.keys(this.connections).length
 	}
 
 	static get Connection(){
@@ -37,7 +37,7 @@ class Server extends EventEmitter {
 		this.config = {
 			..._config
 		}
-		this.connections = []
+		this.connections = {}
 		this.verify = this.allow
 
 		this.server = http.createServer()
@@ -53,6 +53,9 @@ class Server extends EventEmitter {
 		this.ws.on('listening', this.emit.bind(this, "listening"))
 
 		this.server.on('upgrade', this.Upgrade.bind(this))
+
+		this.heartbeatInterval = setInterval(() => this.ping(), 30000); // Каждые 30 секунд
+    	this.server.on('close', () => clearInterval(this.heartbeatInterval));
 	}
 
 
@@ -102,7 +105,7 @@ class Server extends EventEmitter {
 	}
 
 	onClientConnect(ws, id) {
-		const old = this.connections.find(c => c.id === id)
+		const old = this.connections[id]
 		if (old) {
 			old.client.close()
 		}
@@ -113,15 +116,15 @@ class Server extends EventEmitter {
 		ws.on("close", this.onClose.bind(this, conn))
 		ws.on("pong", () => ws.isAlive = true)
 
-		this.connections.push(conn)
+		this.connections[id]=conn
 
 		this.emit("connect", id, conn);
 	}
 
 	onClose(conn, code, reason) {
-		const index = this.connections.indexOf(conn)
-		if (index >= 0)
-			this.connections.splice(index, 1)
+		if(this.connections[conn.id]){
+			delete this.connections[conn.id]
+		}
 		this.emit("disconnect", conn.id, code, reason,conn)
 	}
 
@@ -132,16 +135,15 @@ class Server extends EventEmitter {
 	//#endregion
 
 	getConnection(id){
-		return this.connections.find(c=>c.id===id)
+		return this.connections[id]
 	}
 
 	closeConnection(target) {
-		const t = this.connections.find(c => c.id === target)
-		if (!t)
-			return
-		this.connections = this.connections.filter(c => c.id !== target)
-		t.close()
-
+		if(this.connections[target]){
+			const t = this.connections[target]
+			delete this.connections[target]
+			t.close()
+		}
 	}
 
 	/**
@@ -152,15 +154,15 @@ class Server extends EventEmitter {
 	 * @param {Boolean} include
 	 */
 	filter(values={},include=false){
-		return this.connections.filter(c => {
-			const keys = Object.keys(values)
-			for(let i=0;i<keys.length;i++){
-				const key = keys[i]
+		return Object.values(this.connections).filter(c => {
+			const keys = Object.keys(values);
+			for (let i = 0; i < keys.length; i++) {
+				const key = keys[i];
 				if (c[key] === values[key])
-					return include
+					return include;
 			}
-			return !include
-		})
+			return !include;
+		});
 	}
 
 	/**
@@ -183,13 +185,22 @@ class Server extends EventEmitter {
 		targets.forEach(c => c.send(data))
 	}
 	ping() {
-		this.connections.forEach(c => {
+		Object.values(this.connections).forEach(c => {
 			if (c?.client?.isAlive === false)
 				return c.close(true)
 			c.client.isAlive = false
 			c.client.ping();
 		});
 	}
+
+	async shutdown() {
+        clearInterval(this.heartbeatInterval);
+        for (const conn of this.connections.values()) {
+            conn.close(1001, 'Server shutting down');
+        }
+        this.ws.close();
+        this.server.close();
+    }
 	
 }
 

@@ -4,6 +4,9 @@ const _clientOptions = {
 	binary: false, mask: false
 }
 
+/**
+ * Клиентское подключение в сервере
+ */
 class Connection extends EventEmitter {
 
 	static SetOptions(key,value){

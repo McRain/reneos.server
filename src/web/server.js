@@ -11,20 +11,13 @@ function parseFileData(contentType, req) {
         const parts = req.data.split(`--${boundary}`);
         req.files = {}
         parts.forEach(part => {
-            // Находим заголовок Content-Disposition, который содержит имя файла
             const match = /Content-Disposition:.*filename="(.*)"/.exec(part);
             if (match) {
-                // Найден файл
                 const fileName = match[1].trim();
-
-                // Ищем позицию начала данных файла
                 const start = part.indexOf('\r\n\r\n') + 4;
-
-                // Получаем данные файла и сохраняем его
-                const fileData = part.substring(start, part.length - 2); // Избегаем последнего boundary
+                const fileData = part.substring(start, part.length - 2);
                 req.files[fileName] = fileData
-                //const result = fs.writeFileSync(`./${fileName}`, fileData)
-                //console.log(result)
+                fs.writeFileSync(`./${fileName}`, fileData)
             }
         });
     } catch (error) {
@@ -156,9 +149,9 @@ class WebServer {
     }
 
     async works(req, res) {
-        const result = await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
-        if (result.some(v => v.value === true))
-            return
+        //const result = await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
+        //if (result.some(v => v.value === true))
+        //    return
         let handlers = []
         const contentType = req.headers['content-type']
         if (contentType) {
@@ -166,7 +159,6 @@ class WebServer {
                 parseFileData(contentType, req)
             }
         }
-
         const url = req.path || ""
         const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
         const routs = ["*", normalizedUrl, `${normalizedUrl}/`]
@@ -188,8 +180,6 @@ class WebServer {
         }
         if (handlers.length === 0) {
             //check files
-
-
             const fileUrl = url.endsWith('/') ? `${url}index.html` : url
             if (this.streamFile(fileUrl, res)) {
                 return
@@ -201,8 +191,7 @@ class WebServer {
                 }
             }
             this.standarts[404](req, res)
-            const endTime = process.hrtime(req.time)
-            res.time = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(2)
+            res.time = Date.now() - req.time
             return;
         }
         let results = {}
@@ -226,7 +215,7 @@ class WebServer {
         if (results === null || results === undefined) {
             return
         }
-        
+
         if (typeof results === "object") {
             //res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -238,7 +227,7 @@ class WebServer {
     }
 
     handle(req, res) {
-        req.time = process.hrtime()
+        req.time = Date.now()
         req.cookie = {}
         res.cookie = {}
         const parsedUrl = new URL(req.url, `http://${req.headers.host}`)
@@ -257,9 +246,8 @@ class WebServer {
             })
             res.setHeader('Cookie', cookies)
             res.setHeader('Set-Cookie', cookies)
-
-            const endTime = process.hrtime(req.time)
-            res.time = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(2)
+            if (!res.time)
+                res.time = Date.now() - req.time
 
             end.apply(res, args)
         }
