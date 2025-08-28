@@ -149,9 +149,12 @@ class WebServer {
     }
 
     async works(req, res) {
-        //const result = await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
-        //if (result.some(v => v.value === true))
-        //    return
+        const result = await Promise.allSettled(this.middlewares.map(mw => mw(req, res)))
+        if (result.some(v => v.status !== 'fulfilled')) {
+            res.writeHead(500);
+            res.end();
+            return
+        }
         let handlers = []
         const contentType = req.headers['content-type']
         if (contentType) {
